@@ -266,11 +266,11 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
     ? image
     : (image ? `/${image}` : 'https://via.placeholder.com/800x600?text=Upload+Image');
 
-  // Prevent CORS caching issues on Cloudinary links during download by appending a query string
-  const imageUrl = safeStartsWith(safeImageUrl, 'http') ? `${safeImageUrl}${safeImageUrl.includes('?') ? '&' : '?'}v=${Date.now()}` : safeImageUrl;
+  // Simplified image URL logic without Date.now() to prevent constant re-fetching and instability during download
+  const imageUrl = safeImageUrl;
 
   const safeLogoUrl = globalLogo ? (safeStartsWith(globalLogo, 'http') ? globalLogo : `/${globalLogo}`) : null;
-  const logoUrl = safeStartsWith(safeLogoUrl, 'http') ? `${safeLogoUrl}${safeLogoUrl.includes('?') ? '&' : '?'}v=${Date.now()}` : safeLogoUrl;
+  const logoUrl = safeLogoUrl;
   
   const safeSubImageUrl = subImage ? (
     (safeStartsWith(subImage, 'http') || safeStartsWith(subImage, 'blob:') || safeStartsWith(subImage, 'data:'))
@@ -278,27 +278,30 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
       : `/${subImage}`
   ) : null;
   
-  const subImageUrl = safeStartsWith(safeSubImageUrl, 'http') ? `${safeSubImageUrl}${safeSubImageUrl.includes('?') ? '&' : '?'}v=${Date.now()}` : safeSubImageUrl;
+  const subImageUrl = safeSubImageUrl;
+
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownload = async () => {
-    if (cardRef.current === null) return;
+    if (cardRef.current === null || isDownloading) return;
 
     try {
-      const dataUrl = await toPng(cardRef.current, {
+      setIsDownloading(true);
+      
+      // Options for capture
+      const options = {
         cacheBust: true,
         pixelRatio: 2,
         useCORS: true,
-        allowTaint: true,
+        backgroundColor: cardBgColor,
         skipFonts: false,
         onclone: (clonedDoc) => {
-            // Safari/Webkit often drops external fonts unless the stylesheet is physically injected into the clone
             const fontLink = clonedDoc.createElement('link');
             fontLink.href = "https://fonts.googleapis.com/css2?family=Anton&family=Arvo:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;700;900&family=Lato:wght@300;400;700&family=Lora:wght@400;700&family=Merriweather:wght@300;400;700;900&family=Montserrat:wght@300;400;700;900&family=Nunito:wght@300;400;700&family=Open+Sans:wght@300;400;600;700&family=Oswald:wght@300;400;700&family=PT+Sans:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;700&family=Raleway:wght@300;400;700&family=Roboto:wght@300;400;700&family=Ubuntu:wght@300;400;700&family=Anek+Malayalam:wdth,wght@75,300;75,400;75,700;75,800;100,300;100,400;100,700;100,800&family=Baloo+Chettan+2:wght@400;600;800&family=Gayathri:wght@100;400;700&family=Manjari:wght@100;400;700&family=Noto+Sans+Malayalam:wght@100;400;700;900&family=Noto+Serif+Malayalam:wght@400;700&display=swap";
             fontLink.rel = "stylesheet";
             clonedDoc.head.appendChild(fontLink);
         },
         filter: (node) => {
-          // Exclude markers and UI from capture
           if (node.classList && (
             node.classList.contains('card-actions-overlay') || 
             node.classList.contains('action-btn-overlay') ||
@@ -308,7 +311,16 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
           }
           return true;
         }
-      });
+      };
+
+      // Technique: Call once to warm up the cache, then again for the actual capture.
+      // This solves many "missing image" issues in html-to-image.
+      await toPng(cardRef.current, options);
+      
+      // Small delay for stability
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const dataUrl = await toPng(cardRef.current, options);
 
       const link = document.createElement('a');
       link.download = `news-card-${Date.now()}.png`;
@@ -316,6 +328,9 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
       link.click();
     } catch (err) {
       console.error('Could not download image', err);
+      alert('Failed to download image. Please try again.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -334,7 +349,7 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
             alt={title}
             className="card-image-subject"
             style={imageDynamicStyle}
-            crossOrigin={(safeStartsWith(imageUrl, 'http://') || safeStartsWith(imageUrl, 'https://')) ? 'anonymous' : undefined}
+            crossOrigin="anonymous"
           />
           {isPreview && (
             <button 
@@ -359,7 +374,7 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
               alt="Sub Subject"
               className={`card-sub-image ${isPreview && activeEditTarget === 'sub' ? 'is-preview-target' : ''}`}
               style={subImageDynamicStyle}
-              crossOrigin={(safeStartsWith(subImageUrl, 'http://') || safeStartsWith(subImageUrl, 'https://')) ? 'anonymous' : undefined}
+              crossOrigin="anonymous"
             />
             {isPreview && (
               <button 
@@ -511,13 +526,22 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
         {/* Download & Edit Button Overlay - Hidden during capture */}
         {!isPreview && (
           <div className="card-actions-overlay">
-            <button className="action-btn-overlay" onClick={handleDownload} title="Download as Image">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              Download
+            <button 
+              className="action-btn-overlay" 
+              onClick={handleDownload} 
+              title="Download as Image"
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <span className="loader-inline"></span>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+              )}
+              {isDownloading ? 'Processing...' : 'Download'}
             </button>
             {onEdit && (
               <button className="action-btn-overlay edit-btn" onClick={onEdit} title="Edit Card">

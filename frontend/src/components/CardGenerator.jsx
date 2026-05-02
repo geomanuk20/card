@@ -350,7 +350,8 @@ const CardGenerator = ({ onCardGenerated, globalLogo, editCardData }) => {
       alert('Card generated successfully!');
     } catch (error) {
       console.error('Error generating card:', error);
-      alert('Failed to generate card');
+      const errorMsg = error.response?.data?.error || error.message;
+      alert(`Failed to generate card: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
