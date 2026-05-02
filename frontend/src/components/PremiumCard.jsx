@@ -285,16 +285,27 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
     try {
       setIsDownloading(true);
       
+      // 1. Image Pre-flight: Wait for all images in the card to be fully loaded and decoded
+      const images = cardRef.current.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return img.decode().catch(() => {});
+        return new Promise(resolve => {
+          img.onload = () => img.decode().then(resolve).catch(resolve);
+          img.onerror = resolve;
+        });
+      }));
+
       // Options for capture
       const options = {
         cacheBust: true,
-        pixelRatio: 2,
+        pixelRatio: 3, // High-res
         useCORS: true,
         backgroundColor: cardBgColor,
         skipFonts: false,
         onclone: (clonedDoc) => {
             const fontLink = clonedDoc.createElement('link');
-            fontLink.href = "https://fonts.googleapis.com/css2?family=Anton&family=Arvo:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;700;900&family=Lato:wght@300;400;700&family=Lora:wght@400;700&family=Merriweather:wght@300;400;700;900&family=Montserrat:wght@300;400;700;900&family=Nunito:wght@300;400;700&family=Open+Sans:wght@300;400;600;700&family=Oswald:wght@300;400;700&family=PT+Sans:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;700&family=Raleway:wght@300;400;700&family=Roboto:wght@300;400;700&family=Ubuntu:wght@300;400;700&family=Anek+Malayalam:wdth,wght@75,300;75,400;75,700;75,800;100,300;100,400;100,700;100,800&family=Baloo+Chettan+2:wght@400;600;800&family=Gayathri:wght@100;400;700&family=Manjari:wght@100;400;700&family=Noto+Sans+Malayalam:wght@100;400;700;900&family=Noto+Serif+Malayalam:wght@400;700&display=swap";
+            // Using display=block to discourage font swapping during capture
+            fontLink.href = "https://fonts.googleapis.com/css2?family=Anton&family=Arvo:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;700;900&family=Lato:wght@300;400;700&family=Lora:wght@400;700&family=Merriweather:wght@300;400;700;900&family=Montserrat:wght@300;400;700;900&family=Nunito:wght@300;400;700&family=Open+Sans:wght@300;400;600;700&family=Oswald:wght@300;400;700&family=PT+Sans:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;700&family=Raleway:wght@300;400;700&family=Roboto:wght@300;400;700&family=Ubuntu:wght@300;400;700&family=Anek+Malayalam:wdth,wght@75,300;75,400;75,700;75,800;100,300;100,400;100,700;100,800&family=Baloo+Chettan+2:wght@400;600;800&family=Gayathri:wght@100;400;700&family=Manjari:wght@100;400;700&family=Noto+Sans+Malayalam:wght@100;400;700;900&family=Noto+Serif+Malayalam:wght@400;700&display=block";
             fontLink.rel = "stylesheet";
             clonedDoc.head.appendChild(fontLink);
         },
@@ -310,13 +321,13 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
         }
       };
 
-      // Technique: Call once to warm up the cache, then again for the actual capture.
-      // This solves many "missing image" issues in html-to-image.
+      // 2. Warm-up capture
       await toPng(cardRef.current, options);
       
-      // Small delay for stability
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // 3. Extended delay for font and style stability
+      await new Promise(resolve => setTimeout(resolve, 500));
 
+      // 4. Final high-quality capture
       const dataUrl = await toPng(cardRef.current, options);
 
       const link = document.createElement('a');
