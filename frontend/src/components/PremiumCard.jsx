@@ -308,11 +308,18 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
         backgroundColor: cardBgColor,
         skipFonts: false,
         onclone: (clonedDoc) => {
-            // Re-inject the fonts into the clone to ensure they are available in the SVG context
-            const fontLink = clonedDoc.createElement('link');
-            fontLink.href = "https://fonts.googleapis.com/css2?family=Anton&family=Arvo:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;700;900&family=Lato:wght@300;400;700&family=Lora:wght@400;700&family=Merriweather:wght@300;400;700;900&family=Montserrat:wght@300;400;700;900&family=Nunito:wght@300;400;700&family=Open+Sans:wght@300;400;600;700&family=Oswald:wght@300;400;700&family=PT+Sans:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;700&family=Raleway:wght@300;400;700&family=Roboto:wght@300;400;700&family=Ubuntu:wght@300;400;700&family=Anek+Malayalam:wdth,wght@75,300;75,400;75,700;75,800;100,300;100,400;100,700;100,800&family=Baloo+Chettan+2:wght@400;600;800&family=Gayathri:wght@100;400;700&family=Manjari:wght@100;400;700&family=Noto+Sans+Malayalam:wght@100;400;700;900&family=Noto+Serif+Malayalam:wght@400;700&display=block";
-            fontLink.rel = "stylesheet";
-            clonedDoc.head.appendChild(fontLink);
+            // Deep mirror styles: Copy all link and style tags from the original head to the clone
+            // This ensures fonts and layout are 100% identical to the live view
+            const originalHead = document.head;
+            const clonedHead = clonedDoc.head;
+            
+            // Clear the cloned head's existing styles to avoid conflicts
+            Array.from(clonedHead.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => el.remove());
+            
+            // Append all original styles
+            Array.from(originalHead.querySelectorAll('link, style')).forEach(el => {
+              clonedHead.appendChild(el.cloneNode(true));
+            });
         },
         filter: (node) => {
           if (node.classList && (
