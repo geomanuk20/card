@@ -285,7 +285,12 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
     try {
       setIsDownloading(true);
       
-      // 1. Image Pre-flight: Wait for all images in the card to be fully loaded and decoded
+      // 1. Wait for all fonts to be fully loaded and ready (Critical for Render.com)
+      if (document.fonts) {
+        await document.fonts.ready;
+      }
+
+      // 2. Image Pre-flight: Wait for all images to be loaded and decoded
       const images = cardRef.current.querySelectorAll('img');
       await Promise.all(Array.from(images).map(img => {
         if (img.complete) return img.decode().catch(() => {});
@@ -298,13 +303,13 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
       // Options for capture
       const options = {
         cacheBust: true,
-        pixelRatio: 3, // High-res
+        pixelRatio: 3, 
         useCORS: true,
         backgroundColor: cardBgColor,
         skipFonts: false,
         onclone: (clonedDoc) => {
+            // Re-inject the fonts into the clone to ensure they are available in the SVG context
             const fontLink = clonedDoc.createElement('link');
-            // Using display=block to discourage font swapping during capture
             fontLink.href = "https://fonts.googleapis.com/css2?family=Anton&family=Arvo:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;700;900&family=Lato:wght@300;400;700&family=Lora:wght@400;700&family=Merriweather:wght@300;400;700;900&family=Montserrat:wght@300;400;700;900&family=Nunito:wght@300;400;700&family=Open+Sans:wght@300;400;600;700&family=Oswald:wght@300;400;700&family=PT+Sans:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;700&family=Raleway:wght@300;400;700&family=Roboto:wght@300;400;700&family=Ubuntu:wght@300;400;700&family=Anek+Malayalam:wdth,wght@75,300;75,400;75,700;75,800;100,300;100,400;100,700;100,800&family=Baloo+Chettan+2:wght@400;600;800&family=Gayathri:wght@100;400;700&family=Manjari:wght@100;400;700&family=Noto+Sans+Malayalam:wght@100;400;700;900&family=Noto+Serif+Malayalam:wght@400;700&display=block";
             fontLink.rel = "stylesheet";
             clonedDoc.head.appendChild(fontLink);
@@ -321,13 +326,13 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
         }
       };
 
-      // 2. Warm-up capture
+      // 3. Warm-up capture to prime the library's internal cache
       await toPng(cardRef.current, options);
       
-      // 3. Extended delay for font and style stability
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 4. Extended stability delay (increased to 800ms for Render.com latency)
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      // 4. Final high-quality capture
+      // 5. Final capture
       const dataUrl = await toPng(cardRef.current, options);
 
       const link = document.createElement('a');
