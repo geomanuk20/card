@@ -261,24 +261,21 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
   // Helper for safe string checks
   const safeStartsWith = (str, prefix) => typeof str === 'string' && str.startsWith(prefix);
 
-  // Handle local vs remote image vs preview blob
-  const safeImageUrl = (safeStartsWith(image, 'http') || safeStartsWith(image, 'blob:') || safeStartsWith(image, 'data:'))
-    ? image
-    : (image ? `/${image}` : 'https://via.placeholder.com/800x600?text=Upload+Image');
+  // Ensure URLs are absolute for better compatibility with html-to-image
+  const getAbsoluteUrl = (url) => {
+    if (!url) return null;
+    if (safeStartsWith(url, 'http') || safeStartsWith(url, 'blob:') || safeStartsWith(url, 'data:')) {
+      return url;
+    }
+    // Ensure relative paths are absolute
+    const base = window.location.origin;
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${base}${path}`;
+  };
 
-  // Simplified image URL logic without Date.now() to prevent constant re-fetching and instability during download
-  const imageUrl = safeImageUrl;
-
-  const safeLogoUrl = globalLogo ? (safeStartsWith(globalLogo, 'http') ? globalLogo : `/${globalLogo}`) : null;
-  const logoUrl = safeLogoUrl;
-  
-  const safeSubImageUrl = subImage ? (
-    (safeStartsWith(subImage, 'http') || safeStartsWith(subImage, 'blob:') || safeStartsWith(subImage, 'data:'))
-      ? subImage
-      : `/${subImage}`
-  ) : null;
-  
-  const subImageUrl = safeSubImageUrl;
+  const imageUrl = getAbsoluteUrl(image) || 'https://via.placeholder.com/800x600?text=Upload+Image';
+  const logoUrl = getAbsoluteUrl(globalLogo);
+  const subImageUrl = getAbsoluteUrl(subImage);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
