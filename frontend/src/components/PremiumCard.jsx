@@ -258,24 +258,63 @@ const PremiumCard = ({ card, globalLogo, isPreview = false, onImagePositionChang
   const month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase();
   const year = dateObj.getFullYear();
 
+  // States for Base64 versions of images to ensure perfect downloads
+  const [mainBase64, setMainBase64] = useState(null);
+  const [subBase64, setSubBase64] = useState(null);
+  const [logoBase64, setLogoBase64] = useState(null);
+
   // Helper for safe string checks
   const safeStartsWith = (str, prefix) => typeof str === 'string' && str.startsWith(prefix);
 
-  // Ensure URLs are absolute for better compatibility with html-to-image
+  // Ensure URLs are absolute
   const getAbsoluteUrl = (url) => {
     if (!url) return null;
     if (safeStartsWith(url, 'http') || safeStartsWith(url, 'blob:') || safeStartsWith(url, 'data:')) {
       return url;
     }
-    // Ensure relative paths are absolute
     const base = window.location.origin;
     const path = url.startsWith('/') ? url : `/${url}`;
     return `${base}${path}`;
   };
 
-  const imageUrl = getAbsoluteUrl(image) || 'https://via.placeholder.com/800x600?text=Upload+Image';
-  const logoUrl = getAbsoluteUrl(globalLogo);
-  const subImageUrl = getAbsoluteUrl(subImage);
+  // Convert a URL to Base64 to make it "bulletproof" for the capture library
+  const convertToBase64 = async (url) => {
+    if (!url) return null;
+    // If it's already a data URL or blob, we can use it or convert it
+    if (safeStartsWith(url, 'data:')) return url;
+    
+    try {
+      const response = await fetch(url, { mode: 'cors' });
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.warn(`Failed to convert image to Base64: ${url}`, err);
+      return url; // Fallback to original URL if conversion fails
+    }
+  };
+
+  // Effect to prepare all images as Base64
+  useEffect(() => {
+    const prepareImages = async () => {
+      const mainUrl = getAbsoluteUrl(image);
+      const sUrl = getAbsoluteUrl(subImage);
+      const lUrl = getAbsoluteUrl(globalLogo);
+
+      if (mainUrl) convertToBase64(mainUrl).then(setMainBase64);
+      if (sUrl) convertToBase64(sUrl).then(setSubBase64);
+      if (lUrl) convertToBase64(lUrl).then(setLogoBase64);
+    };
+    prepareImages();
+  }, [image, subImage, globalLogo]);
+
+  // Use Base64 versions if available, otherwise fallback to absolute URLs
+  const imageUrl = mainBase64 || getAbsoluteUrl(image) || 'https://via.placeholder.com/800x600?text=Upload+Image';
+  const logoUrl = logoBase64 || getAbsoluteUrl(globalLogo);
+  const subImageUrl = subBase64 || getAbsoluteUrl(subImage);
 
   const [isDownloading, setIsDownloading] = useState(false);
 
